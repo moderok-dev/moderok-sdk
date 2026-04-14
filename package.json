@@ -1,0 +1,60 @@
+{
+  "name": "@moderok/sdk",
+  "version": "1.0.0",
+  "description": "Lightweight analytics for browser extensions",
+  "license": "MIT",
+  "author": "Moderok",
+  "homepage": "https://moderok.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moderok-dev/moderok-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/moderok-dev/moderok-sdk/issues"
+  },
+  "keywords": [
+    "analytics",
+    "browser-extension",
+    "chrome-extension",
+    "mv3",
+    "web-extension",
+    "telemetry"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/moderok.cjs",
+  "module": "./dist/moderok.js",
+  "types": "./dist/moderok.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/moderok.d.ts",
+      "import": "./dist/moderok.js",
+      "require": "./dist/moderok.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.24",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
+  }
+}
