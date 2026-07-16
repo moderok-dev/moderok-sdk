@@ -113,6 +113,9 @@ class ModerokClient {
         this.state = { ...this.state, pendingEvents: pendingEvents.length ? pendingEvents : undefined };
         await saveState(this.state);
       },
+      async (delivered) => {
+        await this.commitDeliveredPings(delivered);
+      },
     );
 
     this.queue.start();
@@ -256,9 +259,15 @@ class ModerokClient {
       this.queue.enqueue(this.makeEvent("__first_open", Date.now()));
     }
 
+    // lastPingDate is only advanced once the server ACCEPTS the ping (see
+    // commitDeliveredPings) — committing it here would mark the day as counted
+    // even when the batch is rejected (e.g. usage-cap 429) and never retried.
+    // A ping already sitting in the recovered queue must not be duplicated.
     const today = utcDateStamp(Date.now());
-    if (this.state.lastPingDate !== today) {
-      this.state.lastPingDate = today;
+    const pingAlreadyQueued = (this.state.pendingEvents ?? []).some(
+      (event) => event.name === "__daily_ping" && utcDateStamp(event.timestamp) === today,
+    );
+    if (this.state.lastPingDate !== today && !pingAlreadyQueued) {
       this.queue.enqueue(this.makeEvent("__daily_ping", Date.now()));
     }
 
@@ -309,6 +318,24 @@ class ModerokClient {
     for (const draft of this.drafts.splice(0)) {
       this.queue.enqueue(this.makeEvent(draft.name, draft.timestamp, draft.properties, draft.id));
     }
+  }
+
+  private async commitDeliveredPings(delivered: ModEvent[]): Promise<void> {
+    let latest: string | null = null;
+    for (const event of delivered) {
+      if (event.name !== "__daily_ping") continue;
+      const stamp = utcDateStamp(event.timestamp);
+      if (!latest || stamp > latest) latest = stamp;
+    }
+    if (!latest) return;
+    if (this.state.lastPingDate && this.state.lastPingDate >= latest) return;
+
+    this.state.lastPingDate = latest;
+    await saveState(this.state);
+    void saveIdentityToSync({
+      userId: this.userId,
+      lastPingDate: latest,
+    });
   }
 
   private handleLifecycle(details: chrome.runtime.InstalledDetails): void {

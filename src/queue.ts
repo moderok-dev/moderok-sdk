@@ -5,8 +5,12 @@ const MAX_QUEUE_SIZE = 1000;
 const MAX_EVENT_BYTES = 8 * 1024;
 const MAX_PERSISTED_EVENTS = 500;
 const PERSIST_DEBOUNCE_MS = 5000;
+const BASE_RETRY_DELAY_MS = 30_000;
+const MAX_RETRY_DELAY_MS = 60 * 60_000;
+const MAX_RETRY_AFTER_MS = 6 * 60 * 60_000;
 
 type PersistQueue = (events: ModEvent[]) => Promise<void>;
+type OnDelivered = (events: ModEvent[]) => Promise<void>;
 
 export function capForPersistence(events: ModEvent[]): ModEvent[] {
   if (events.length <= MAX_PERSISTED_EVENTS) return events;
@@ -28,6 +32,8 @@ export class EventQueue {
   private flushPromise: Promise<void> | null = null;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryBlockedUntil = 0;
+  private consecutiveRetryableFailures = 0;
 
   constructor(
     private readonly appKey: string,
@@ -36,6 +42,7 @@ export class EventQueue {
     private readonly flushInterval: number,
     private readonly debug: boolean,
     private readonly persistQueue: PersistQueue,
+    private readonly onDelivered?: OnDelivered,
   ) {}
 
   start(): void {
@@ -103,6 +110,13 @@ export class EventQueue {
 
   private async flushLoop(): Promise<void> {
     while (this.queue.length) {
+      if (Date.now() < this.retryBlockedUntil) {
+        if (this.debug) {
+          console.debug("[moderok] Flush skipped (retry backoff active).");
+        }
+        return;
+      }
+
       const batch = this.queue.slice(0, this.batchSize);
       if (this.debug) {
         console.debug(`[moderok] Flushing batch of ${batch.length} event(s)…`);
@@ -118,12 +132,27 @@ export class EventQueue {
         if (this.debug) {
           console.debug(`[moderok] Flush succeeded. Remaining in queue: ${this.queue.length - batch.length}`);
         }
+        this.retryBlockedUntil = 0;
+        this.consecutiveRetryableFailures = 0;
         this.queue = this.queue.slice(batch.length);
         await this.persistQueue(capForPersistence(this.queue));
+        if (this.onDelivered) {
+          await this.onDelivered(batch);
+        }
         continue;
       }
 
       if (result.retryable) {
+        this.consecutiveRetryableFailures += 1;
+        const backoff = Math.min(
+          BASE_RETRY_DELAY_MS * 2 ** (this.consecutiveRetryableFailures - 1),
+          MAX_RETRY_DELAY_MS,
+        );
+        const delay =
+          result.retryAfterMs !== undefined
+            ? Math.min(result.retryAfterMs, MAX_RETRY_AFTER_MS)
+            : backoff;
+        this.retryBlockedUntil = Date.now() + delay;
         await this.persistQueue(capForPersistence(this.queue));
         return;
       }

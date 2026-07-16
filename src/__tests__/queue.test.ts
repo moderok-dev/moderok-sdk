@@ -130,3 +130,101 @@ describe("EventQueue", () => {
     expect(persistedEvents[0].name).toBe("leftover");
   });
 });
+
+describe("EventQueue flush behavior", () => {
+  const noopPersist = async () => {};
+  let fetchStatus = 200;
+  let fetchHeaders: Record<string, string> = {};
+  let fetchCalls = 0;
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    fetchStatus = 200;
+    fetchHeaders = {};
+    fetchCalls = 0;
+    globalThis.fetch = vi.fn(async () => {
+      fetchCalls += 1;
+      return new Response(null, { status: fetchStatus, headers: fetchHeaders });
+    }) as typeof fetch;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.fetch = originalFetch;
+  });
+
+  it("invokes onDelivered with the accepted batch", async () => {
+    const delivered: ModEvent[][] = [];
+    const queue = new EventQueue("mk_test", "http://localhost", 20, 0, false, noopPersist, async (batch) => {
+      delivered.push(batch);
+    });
+
+    queue.enqueue(makeEvent({ name: "__daily_ping" }));
+    queue.enqueue(makeEvent({ name: "other" }));
+    await queue.flush();
+
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0].map((e) => e.name)).toEqual(["__daily_ping", "other"]);
+    expect(queue.size).toBe(0);
+  });
+
+  it("keeps the batch and backs off on 429 instead of dropping it", async () => {
+    fetchStatus = 429;
+    const delivered: ModEvent[][] = [];
+    const queue = new EventQueue("mk_test", "http://localhost", 20, 0, false, noopPersist, async (batch) => {
+      delivered.push(batch);
+    });
+
+    queue.enqueue(makeEvent({ name: "capped_event" }));
+    await queue.flush();
+
+    expect(queue.size).toBe(1);
+    expect(delivered).toHaveLength(0);
+    expect(fetchCalls).toBe(1);
+
+    // Backoff active: an immediate flush must not hit the network again.
+    await queue.flush();
+    expect(fetchCalls).toBe(1);
+
+    // After the backoff window the flush retries and succeeds.
+    fetchStatus = 202;
+    vi.advanceTimersByTime(31_000);
+    await queue.flush();
+    expect(fetchCalls).toBe(2);
+    expect(queue.size).toBe(0);
+    expect(delivered).toHaveLength(1);
+  });
+
+  it("respects Retry-After for the backoff window", async () => {
+    fetchStatus = 429;
+    fetchHeaders = { "Retry-After": "300" };
+    const queue = new EventQueue("mk_test", "http://localhost", 20, 0, false, noopPersist);
+
+    queue.enqueue(makeEvent());
+    await queue.flush();
+    expect(fetchCalls).toBe(1);
+
+    // Still blocked after the default 30s backoff would have expired.
+    vi.advanceTimersByTime(60_000);
+    await queue.flush();
+    expect(fetchCalls).toBe(1);
+
+    fetchStatus = 202;
+    vi.advanceTimersByTime(241_000);
+    await queue.flush();
+    expect(fetchCalls).toBe(2);
+    expect(queue.size).toBe(0);
+  });
+
+  it("still drops the batch on non-retryable statuses", async () => {
+    fetchStatus = 400;
+    const queue = new EventQueue("mk_test", "http://localhost", 20, 0, false, noopPersist);
+
+    queue.enqueue(makeEvent());
+    await queue.flush();
+
+    expect(queue.size).toBe(0);
+    expect(fetchCalls).toBe(1);
+  });
+});

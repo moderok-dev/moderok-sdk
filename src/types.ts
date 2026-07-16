@@ -69,4 +69,5 @@ export interface TransportResult {
   success: boolean;
   retryable?: boolean;
   status?: number;
+  retryAfterMs?: number;
 }

@@ -3,6 +3,7 @@ import { sendPayload } from "../transport";
 import type { FlushPayload } from "../types";
 
 let nextStatus = 200;
+let nextResponseHeaders: Record<string, string> = {};
 let shouldThrow = false;
 let lastHeaders: HeadersInit | undefined;
 let lastBody = "";
@@ -41,12 +42,13 @@ beforeEach(() => {
 
     lastHeaders = init?.headers;
     lastBody = typeof init?.body === "string" ? init.body : "";
-    return new Response(null, { status: nextStatus });
+    return new Response(null, { status: nextStatus, headers: nextResponseHeaders });
   }) as typeof fetch;
 });
 
 afterEach(() => {
   nextStatus = 200;
+  nextResponseHeaders = {};
   shouldThrow = false;
   lastHeaders = undefined;
   lastBody = "";
@@ -78,10 +80,35 @@ describe("sendPayload", () => {
     expect(result).toEqual({ success: false, retryable: false, status: 403 });
   });
 
-  it("returns non-retryable for 429", async () => {
+  it("returns retryable for 429 (usage cap / rate limit)", async () => {
     nextStatus = 429;
     const result = await sendPayload("https://api.moderok.dev/v1/events", makePayload(), false);
-    expect(result).toEqual({ success: false, retryable: false, status: 429 });
+    expect(result).toEqual({ success: false, retryable: true, status: 429, retryAfterMs: undefined });
+  });
+
+  it("parses a delta-seconds Retry-After header on 429", async () => {
+    nextStatus = 429;
+    nextResponseHeaders = { "Retry-After": "120" };
+    const result = await sendPayload("https://api.moderok.dev/v1/events", makePayload(), false);
+    expect(result.retryable).toBe(true);
+    expect(result.retryAfterMs).toBe(120_000);
+  });
+
+  it("parses an HTTP-date Retry-After header on 503", async () => {
+    nextStatus = 503;
+    nextResponseHeaders = { "Retry-After": new Date(Date.now() + 60_000).toUTCString() };
+    const result = await sendPayload("https://api.moderok.dev/v1/events", makePayload(), false);
+    expect(result.retryable).toBe(true);
+    expect(result.retryAfterMs).toBeGreaterThan(0);
+    expect(result.retryAfterMs).toBeLessThanOrEqual(60_000);
+  });
+
+  it("ignores an unparseable Retry-After header", async () => {
+    nextStatus = 429;
+    nextResponseHeaders = { "Retry-After": "soon" };
+    const result = await sendPayload("https://api.moderok.dev/v1/events", makePayload(), false);
+    expect(result.retryable).toBe(true);
+    expect(result.retryAfterMs).toBeUndefined();
   });
 
   it("returns retryable for 500", async () => {
