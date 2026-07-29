@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -33,7 +34,9 @@ jobs:
       - name: Publish to NPM
         run: npm publish --provenance --access public
 
+      # Only meaningful for tag pushes; a manual dispatch has no tag to attach to.
       - name: Create GitHub Release with dist assets
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
