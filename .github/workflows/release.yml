@@ -17,18 +17,21 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing (OIDC) requires npm >= 11.5.1, newer than the npm
+      # bundled with Node 22.
+      - run: npm install -g npm@latest
 
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
 
+      # Authenticates via OIDC trusted publishing; no NPM_TOKEN needed.
       - name: Publish to NPM
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release with dist assets
         uses: softprops/action-gh-release@v2
