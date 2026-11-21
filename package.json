@@ -1,6 +1,6 @@
 {
   "name": "@moderok/sdk",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Lightweight analytics for browser extensions",
   "license": "MIT",
   "author": "Moderok",

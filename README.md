@@ -4,7 +4,7 @@ Lightweight analytics and error tracking for **Manifest V3** browser extensions.
 
 | Constraint     | Detail                                                         |
 | -------------- | -------------------------------------------------------------- |
-| Size           | About **5 kB** gzipped (minified)                              |
+| Size           | **5.7 kB** gzipped (5,720 bytes, minified)                     |
 | Permissions    | `"storage"` only — no `host_permissions` required              |
 | Environments   | Service worker, popup, options, side panel, content scripts    |
 | Error tracking | **On by default** for uncaught errors and unhandled rejections |
