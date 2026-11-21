@@ -130,6 +130,22 @@ describe("parseOs", () => {
     expect(parseOs("MacIntel", UA.firefoxMac)).toBe("MacOS");
   });
 
+  it("detects iOS from iPhone Safari, not MacOS", () => {
+    expect(parseOs("iPhone", UA.safariIos)).toBe("iOS");
+  });
+
+  it("detects iOS from the UA alone when platform is empty", () => {
+    expect(parseOs("", UA.safariIos)).toBe("iOS");
+  });
+
+  it("detects iOS from an iPad", () => {
+    expect(parseOs("iPad", UA.safariIos.replace("iPhone; CPU iPhone OS", "iPad; CPU OS"))).toBe("iOS");
+  });
+
+  it("keeps macOS Safari as MacOS", () => {
+    expect(parseOs("MacIntel", UA.safariMac)).toBe("MacOS");
+  });
+
   it("detects Windows from real Firefox UA", () => {
     expect(parseOs("Win32", UA.firefoxWin)).toBe("Windows");
   });
