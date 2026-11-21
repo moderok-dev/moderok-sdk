@@ -15,6 +15,8 @@ const UA = {
   operaMac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 OPR/115.0.0.0",
   braveLinux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Brave/131",
   vivaldiWin: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Vivaldi/7.0.3495.27",
+  safariMac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+  safariIos: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1",
 } as const;
 
 describe("parseBrowser", () => {
@@ -82,6 +84,18 @@ describe("parseBrowser", () => {
     const result = parseBrowser(UA.vivaldiWin);
     expect(result.browser).toBe("other_chromium");
     expect(result.browserVersion).toBe("130.0.0.0");
+  });
+
+  it("detects Safari from real macOS UA", () => {
+    const result = parseBrowser(UA.safariMac);
+    expect(result.browser).toBe("safari");
+    expect(result.browserVersion).toBe("18.2");
+  });
+
+  it("detects Safari from real iOS UA", () => {
+    const result = parseBrowser(UA.safariIos);
+    expect(result.browser).toBe("safari");
+    expect(result.browserVersion).toBe("18.2");
   });
 
   it('returns "unknown" for an empty user agent', () => {

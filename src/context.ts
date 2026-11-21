@@ -11,7 +11,12 @@ export function parseBrowser(ua: string): Pick<EventContext, "browser" | "browse
   if (edge) return { browser: "edge", browserVersion: edge[1] };
 
   const chromeMatch = /Chrome\/([\d.]+)/.exec(ua);
-  if (!chromeMatch) return { browser: "unknown", browserVersion: "unknown" };
+  if (!chromeMatch) {
+    // Safari reports its version as "Version/x" instead of in the "Safari/x" token
+    const safari = /Version\/([\d.]+).*Safari\//.exec(ua);
+    if (safari) return { browser: "safari", browserVersion: safari[1] };
+    return { browser: "unknown", browserVersion: "unknown" };
+  }
 
   const browser = /OPR\/|Brave\/|Vivaldi\//.test(ua) ? "other_chromium" : "chrome";
   return { browser, browserVersion: chromeMatch[1] };
@@ -38,7 +43,12 @@ function detectSource(): EventContext["source"] {
   const href = typeof location === "undefined" ? "" : location.href;
   const protocol = typeof location === "undefined" ? "" : location.protocol;
 
-  if (protocol !== "chrome-extension:" && protocol !== "moz-extension:" && protocol !== "extension:") {
+  if (
+    protocol !== "chrome-extension:" &&
+    protocol !== "moz-extension:" &&
+    protocol !== "safari-web-extension:" &&
+    protocol !== "extension:"
+  ) {
     return typeof chrome !== "undefined" && chrome.runtime?.id ? "content_script" : "unknown";
   }
 

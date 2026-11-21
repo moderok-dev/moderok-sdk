@@ -17,7 +17,7 @@ export interface EventContext {
   sdkVersion: string;
   extensionId: string;
   extensionVersion: string;
-  browser: "chrome" | "edge" | "firefox" | "other_chromium" | "unknown";
+  browser: "chrome" | "edge" | "firefox" | "safari" | "other_chromium" | "unknown";
   browserVersion: string;
   os: "Windows" | "MacOS" | "Linux" | "ChromeOS" | "Android" | "unknown";
   locale: string;
