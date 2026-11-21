@@ -27,6 +27,9 @@ export function parseOs(platform: string, ua: string): EventContext["os"] {
   if (/Android/i.test(source)) return "Android";
   if (/CrOS/i.test(source)) return "ChromeOS";
   if (/Win/i.test(source)) return "Windows";
+  // iOS UAs say "like Mac OS X", so check them first. iPadOS in desktop mode
+  // sends a macOS UA and "MacIntel", so it is still reported as MacOS.
+  if (/iPhone|iPad|iPod/i.test(source)) return "iOS";
   if (/Mac/i.test(source)) return "MacOS";
   if (/Linux/i.test(source)) return "Linux";
   return "unknown";

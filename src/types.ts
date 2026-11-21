@@ -19,7 +19,7 @@ export interface EventContext {
   extensionVersion: string;
   browser: "chrome" | "edge" | "firefox" | "safari" | "other_chromium" | "unknown";
   browserVersion: string;
-  os: "Windows" | "MacOS" | "Linux" | "ChromeOS" | "Android" | "unknown";
+  os: "Windows" | "MacOS" | "iOS" | "Linux" | "ChromeOS" | "Android" | "unknown";
   locale: string;
   source:
     | "background"
